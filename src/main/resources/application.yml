@@ -1,0 +1,37 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/persistentCli?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+
+logging:
+  level:
+    # LangChain4j 在连接闲置后重试时可能打印可恢复的 Connection reset 堆栈。
+    # CLI 示例里只关心最终是否拿到回复，因此降低这些底层 HTTP 重试日志的噪声。
+    dev.langchain4j: ERROR
+    dev.langchain4j.http.client: ERROR
+    dev.ai4j.openai4j: ERROR
+    com.google.adk.models.langchain4j: ERROR
+
+adk:
+  study12:
+    app-name: study12_production_app
+    agent-name: production_best_practices_agent
+    default-user-id: study12-user
+    default-session-id: study12-session
+    max-message-chars: 2000
+    request-timeout-seconds: 120
+    expose-trace: true
+    model:
+      base-url: https://api.siliconflow.cn
+      api-key: sk-lddiozvjmpxmdsdjqcjtthuvpwxrpdiyepesltiwfzbgiicw
+      name: deepseek-ai/DeepSeek-V4-Flash
+      timeout-seconds: 90
+      max-retries: 3
