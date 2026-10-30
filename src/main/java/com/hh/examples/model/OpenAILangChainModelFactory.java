@@ -32,6 +32,21 @@ public final class OpenAILangChainModelFactory {
         return build;
     }
 
+    /**
+     * Creates the configured DeepSeek chat model and asks LangChain4j to parse
+     * the provider's reasoning_content field into AiMessage.thinking().
+     */
+    public static OpenAiChatModel createThinkingChatModel() {
+        return OpenAiChatModel.builder()
+                .baseUrl(BASE_URL)
+                .apiKey(API_KEY)
+                .modelName(MODEL_NAME)
+                .returnThinking(true)
+                .timeout(Duration.ofSeconds(90))
+                .maxRetries(4)
+                .build();
+    }
+
     public static LangChain4j createStreamingChatModel() {
         OpenAiStreamingChatModel streamingChatModel = OpenAiStreamingChatModel.builder()
                 .baseUrl(BASE_URL)
@@ -43,6 +58,20 @@ public final class OpenAILangChainModelFactory {
         return LangChain4j.builder()
                 .streamingChatModel(streamingChatModel)
                 .modelName(MODEL_NAME)
+                .build();
+    }
+
+    /**
+     * Creates the configured DeepSeek streaming model and exposes reasoning_content
+     * through StreamingChatResponseHandler.onPartialThinking().
+     */
+    public static OpenAiStreamingChatModel createThinkingStreamingChatModel() {
+        return OpenAiStreamingChatModel.builder()
+                .baseUrl(BASE_URL)
+                .apiKey(API_KEY)
+                .modelName(MODEL_NAME)
+                .returnThinking(true)
+                .timeout(Duration.ofSeconds(90))
                 .build();
     }
 

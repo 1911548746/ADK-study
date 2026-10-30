@@ -13,3 +13,10 @@
 - [x] 11 SpringBoot Integration
 - [x] 12 Production Best Practices
 - [x] 13 MCP
+- [x] 14 Plugin
+- [x] 15 Skill
+- [x] 16 Thinking Mode
+- [x] 17 ReAct
+- [x] 18 HITL
+- [x] 19 Plan Mode
+- [x] 20 A2A

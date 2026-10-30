@@ -31,7 +31,7 @@ adk:
     expose-trace: true
     model:
       base-url: https://api.siliconflow.cn
-      api-key: sk-lddiozvjmpxmdsdjqcjtthuvpwxrpdiyepesltiwfzbgiicw
+      api-key: nmsl
       name: deepseek-ai/DeepSeek-V4-Flash
       timeout-seconds: 90
       max-retries: 3

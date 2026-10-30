@@ -3,13 +3,20 @@ package com.hh.examples.study07.streaming;
 import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.RunConfig;
 import com.google.adk.events.Event;
+import com.google.adk.plugins.LoggingPlugin;
+import com.google.adk.plugins.Plugin;
 import com.google.adk.runner.InMemoryRunner;
 import com.google.adk.sessions.Session;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 import com.hh.examples.model.OpenAILangChainModelFactory;
+import com.hh.examples.study000.persistentCli.cli.command.CommandResult;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.Scanner;
 
 public final class StreamingExample {
 
@@ -24,7 +31,7 @@ public final class StreamingExample {
         return LlmAgent.builder()
                 .name("streaming_agent")
                 .description("一个只演示 ADK Streaming Response 的最小 Agent。")
-                .model(OpenAILangChainModelFactory.createStreamingChatModel())
+                .model(OpenAILangChainModelFactory.createChatAndStreamingModel())
                 .instruction("""
                         你是一个用于演示 ADK Streaming 的中文助手。
                         回答时分成 3 个短段落，每段 1 到 2 句话。
@@ -39,12 +46,33 @@ public final class StreamingExample {
                 .streamingMode(RunConfig.StreamingMode.SSE)
                 .build();
 
-        InMemoryRunner runner = new InMemoryRunner(createAgent(), APP_NAME);
+        List<Plugin> plugins = List.of(new LoggingPlugin());
+        InMemoryRunner runner = new InMemoryRunner(createAgent(), APP_NAME, plugins);
         Session session = runner.sessionService()
                 .createSession(runner.appName(), USER_ID, Map.of(), SESSION_ID)
                 .blockingGet();
 
-        runTurn(runner, session, "请解释 ADK Streaming 为什么不是简单地更快返回文本。", runConfig);
+        try (Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8)) {
+            while (true) {
+                System.out.print("\n你 > ");
+                System.out.flush();
+                if (!scanner.hasNextLine()) {
+                    break;
+                }
+
+                String input = scanner.nextLine().trim();
+                if (input.equalsIgnoreCase("exit")) {
+                    break;
+                }
+                if (input.isBlank()) {
+                    continue;
+                }
+
+                runTurn(runner, session, input, runConfig);
+            }
+        }
+
+//        runTurn(runner, session, "请解释 ADK Streaming 为什么不是简单地更快返回文本。", runConfig);
     }
 
     private static void runTurn(
@@ -73,6 +101,17 @@ public final class StreamingExample {
             StringBuilder streamedAnswer,
             boolean[] printedTextStream) {
 
+
+        if (!event.functionCalls().isEmpty()) {
+            System.out.println("\nfunctionCalls > " + event.functionCalls());
+            return;
+        }
+
+        if (!event.functionResponses().isEmpty()) {
+            System.out.println("\nfunctionResponses > " + event.functionResponses());
+            return;
+        }
+
         String text = extractText(event);
 
         if (!text.isBlank()) {
@@ -83,15 +122,6 @@ public final class StreamingExample {
             streamedAnswer.append(text);
             System.out.print(text);
             System.out.flush();
-            return;
-        }
-
-        if (!event.functionCalls().isEmpty()) {
-            System.out.println("\nfunctionCalls > " + event.functionCalls());
-        }
-
-        if (!event.functionResponses().isEmpty()) {
-            System.out.println("\nfunctionResponses > " + event.functionResponses());
         }
 
 //        if (event.finalResponse()) {

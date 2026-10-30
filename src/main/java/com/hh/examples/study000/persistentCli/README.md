@@ -135,7 +135,6 @@ src/test/java/com/hh/examples/study000/persistentCli/cli/PersistentCliAgentTest.
 
 - `sessions`：ADK Session 元信息和普通 session state。
 - `session_events`：ADK Event JSON 和常用索引字段。
-- `state_values`：`app:` / `user:` 作用域 state。
 - `memories`：长期记忆。
 - `conversations`：业务会话。
 - `messages`：完整聊天记录。
@@ -147,8 +146,12 @@ src/test/java/com/hh/examples/study000/persistentCli/cli/PersistentCliAgentTest.
 Runner 每产生一个 Event，就会调用 SessionService 保存它。这个方法中做了三件事：
 
 1. 读取 `event.actions().stateDelta()`。
-2. 把普通 state 写回 `sessions.state_json`，把 `app:` / `user:` state 写入 `state_values`。
+2. 把当前 Session 的 state 快照写回 `sessions.state_json`。
 3. 把完整 Event JSON 写入 `session_events`。
+
+本示例为了保持持久化层简单，没有单独实现 `app:` / `user:` 跨 Session state 表。
+如果运行中出现这些前缀的 state key，它们也只会作为当前 Session state 保存在 `sessions.state_json`。
+`temp:` state 会被视为临时状态，不写入数据库。
 
 `messages` 表不来自 ADK Event，而来自业务侧的 `ConversationArchiveService`。这能保证即使 ADK 做 event compaction，业务聊天记录也不会被压缩或丢失。
 

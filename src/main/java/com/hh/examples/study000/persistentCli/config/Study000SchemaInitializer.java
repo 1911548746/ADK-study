@@ -65,20 +65,6 @@ public class Study000SchemaInitializer implements InitializingBean {
                 "ALTER TABLE session_events ADD COLUMN snip_reason TEXT NULL AFTER snip_event_id");
 
         jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS state_values (
-                    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-                    app_name VARCHAR(128) NOT NULL,
-                    user_id VARCHAR(128) NULL,
-                    scope VARCHAR(32) NOT NULL,
-                    state_key VARCHAR(255) NOT NULL,
-                    state_value_json JSON NOT NULL,
-                    created_at DATETIME NOT NULL,
-                    updated_at DATETIME NOT NULL,
-                    UNIQUE KEY uk_state_values_identity (app_name, user_id, scope, state_key)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-                """);
-
-        jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS memories (
                     id BIGINT PRIMARY KEY AUTO_INCREMENT,
                     app_name VARCHAR(128) NOT NULL,

@@ -1,7 +1,6 @@
 package com.hh.examples.study000.persistentCli.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.google.adk.events.Event;
 import com.google.adk.sessions.BaseSessionService;
 import com.google.adk.sessions.GetSessionConfig;
@@ -13,10 +12,8 @@ import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 import com.hh.examples.study000.persistentCli.entity.SessionEntity;
 import com.hh.examples.study000.persistentCli.entity.SessionEventEntity;
-import com.hh.examples.study000.persistentCli.entity.StateValueEntity;
 import com.hh.examples.study000.persistentCli.mapper.SessionEventMapper;
 import com.hh.examples.study000.persistentCli.mapper.SessionMapper;
-import com.hh.examples.study000.persistentCli.mapper.StateValueMapper;
 import com.hh.examples.study000.persistentCli.support.PersistentCliJson;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Maybe;
@@ -38,20 +35,14 @@ import java.util.concurrent.ConcurrentMap;
 @Service
 public class MySqlSessionService implements BaseSessionService {
 
-    private static final String APP_SCOPE = "app";
-    private static final String USER_SCOPE = "user";
-
     private final SessionMapper sessionMapper;
     private final SessionEventMapper eventMapper;
-    private final StateValueMapper stateValueMapper;
 
     public MySqlSessionService(
             SessionMapper sessionMapper,
-            SessionEventMapper eventMapper,
-            StateValueMapper stateValueMapper) {
+            SessionEventMapper eventMapper) {
         this.sessionMapper = sessionMapper;
         this.eventMapper = eventMapper;
-        this.stateValueMapper = stateValueMapper;
     }
 
     @Override
@@ -77,16 +68,11 @@ public class MySqlSessionService implements BaseSessionService {
                     .appName(appName)
                     .userId(userId)
                     .sessionId(resolvedSessionId)
-                    .stateJson(PersistentCliJson.toJson(localStateOnly(state == null ? Map.of() : state)))
+                    .stateJson(PersistentCliJson.toJson(sessionStateSnapshot(state == null ? Map.of() : state)))
                     .createdAt(now)
                     .updatedAt(now)
                     .build();
             sessionMapper.insert(entity);
-
-            // 初始 state 中如果已经包含 app:/user: 作用域，也同步到跨 Session 状态表。
-            if (state != null) {
-                state.forEach((key, value) -> persistScopedState(appName, userId, key, value));
-            }
 
             return buildSession(entity, Optional.empty());
         });
@@ -161,14 +147,14 @@ public class MySqlSessionService implements BaseSessionService {
             // ADK 的 stateDelta 是运行时状态变更；这里必须先合并 state，再保存 session。
             Map<String, Object> stateDelta = event.actions() == null ? Map.of() : event.actions().stateDelta();
             if (stateDelta != null && !stateDelta.isEmpty()) {
-                stateDelta.forEach((key, value) -> applyStateDelta(session, appName, userId, key, value));
+                stateDelta.forEach((key, value) -> applyStateDelta(session, key, value));
             }
 
             persistEvent(appName, userId, sessionId, event);
 
             SessionEntity entity = findSession(appName, userId, sessionId);
             if (entity != null) {
-                entity.setStateJson(PersistentCliJson.toJson(localStateOnly(session.state())));
+                entity.setStateJson(PersistentCliJson.toJson(sessionStateSnapshot(session.state())));
                 entity.setUpdatedAt(LocalDateTime.now());
                 sessionMapper.updateById(entity);
             }
@@ -184,7 +170,6 @@ public class MySqlSessionService implements BaseSessionService {
 
     private Session buildSession(SessionEntity entity, Optional<GetSessionConfig> configOpt) {
         Map<String, Object> state = PersistentCliJson.readMap(entity.getStateJson());
-        mergeScopedState(entity.getAppName(), entity.getUserId(), state);
 
         List<Event> events = loadEvents(
                 entity.getAppName(),
@@ -315,85 +300,17 @@ public class MySqlSessionService implements BaseSessionService {
 
     private void applyStateDelta(
             Session session,
-            String appName,
-            String userId,
             String key,
             Object value) {
-        if (key.startsWith(State.APP_PREFIX)) {
-            persistScopedState(appName, userId, key, value);
+        // 精简版 SessionService 不再维护 app:/user: 跨 Session state。
+        // 所有非 temp: 的 stateDelta 都只作为当前 Session 的 state 保存到 sessions.state_json。
+        if (key.startsWith(State.TEMP_PREFIX)) {
             return;
         }
-        if (key.startsWith(State.USER_PREFIX)) {
-            persistScopedState(appName, userId, key, value);
-            return;
-        }
-
         if (value == State.REMOVED) {
             session.state().remove(key);
         } else {
             session.state().put(key, value);
-        }
-    }
-
-    private void persistScopedState(String appName, String userId, String key, Object value) {
-        if (key.startsWith(State.APP_PREFIX)) {
-            upsertScopedState(appName, "", APP_SCOPE, key.substring(State.APP_PREFIX.length()), value);
-        } else if (key.startsWith(State.USER_PREFIX)) {
-            upsertScopedState(appName, userId, USER_SCOPE, key.substring(State.USER_PREFIX.length()), value);
-        }
-    }
-
-    private void upsertScopedState(String appName, String userId, String scope, String stateKey, Object value) {
-        LambdaQueryWrapper<StateValueEntity> query = new LambdaQueryWrapper<StateValueEntity>()
-                .eq(StateValueEntity::getAppName, appName)
-                .eq(StateValueEntity::getUserId, userId)
-                .eq(StateValueEntity::getScope, scope)
-                .eq(StateValueEntity::getStateKey, stateKey);
-
-        if (value == State.REMOVED) {
-            stateValueMapper.delete(query);
-            return;
-        }
-
-        StateValueEntity existing = stateValueMapper.selectOne(query);
-        LocalDateTime now = LocalDateTime.now();
-        if (existing == null) {
-            StateValueEntity entity = StateValueEntity.builder()
-                    .appName(appName)
-                    .userId(userId)
-                    .scope(scope)
-                    .stateKey(stateKey)
-                    .stateValueJson(PersistentCliJson.toJson(value))
-                    .createdAt(now)
-                    .updatedAt(now)
-                    .build();
-            stateValueMapper.insert(entity);
-        } else {
-            existing.setStateValueJson(PersistentCliJson.toJson(value));
-            existing.setUpdatedAt(now);
-            stateValueMapper.updateById(existing);
-        }
-    }
-
-    private void mergeScopedState(String appName, String userId, Map<String, Object> state) {
-        stateValueMapper.selectList(new LambdaQueryWrapper<StateValueEntity>()
-                        .eq(StateValueEntity::getAppName, appName)
-                        .eq(StateValueEntity::getUserId, "")
-                        .eq(StateValueEntity::getScope, APP_SCOPE))
-                .forEach(row -> state.put(State.APP_PREFIX + row.getStateKey(), readStateValue(row)));
-
-        stateValueMapper.selectList(new LambdaQueryWrapper<StateValueEntity>()
-                        .eq(StateValueEntity::getAppName, appName)
-                        .eq(StateValueEntity::getUserId, userId)
-                        .eq(StateValueEntity::getScope, USER_SCOPE))
-                .forEach(row -> state.put(State.USER_PREFIX + row.getStateKey(), readStateValue(row)));
-    }
-
-    private Object readStateValue(StateValueEntity row) {
-        try {
-            return com.google.adk.JsonBaseModel.getMapper().readValue(row.getStateValueJson(), Object.class);
-        } catch (Exception e) {
-            throw new IllegalStateException("读取 state value 失败: " + row.getStateKey(), e);
         }
     }
 
@@ -404,14 +321,14 @@ public class MySqlSessionService implements BaseSessionService {
                 .eq(SessionEntity::getSessionId, sessionId));
     }
 
-    private Map<String, Object> localStateOnly(Map<String, Object> state) {
-        Map<String, Object> local = new LinkedHashMap<>();
+    private Map<String, Object> sessionStateSnapshot(Map<String, Object> state) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
         state.forEach((key, value) -> {
-            if (!key.startsWith(State.APP_PREFIX) && !key.startsWith(State.USER_PREFIX)) {
-                local.put(key, value);
+            if (!key.startsWith(State.TEMP_PREFIX)) {
+                snapshot.put(key, value);
             }
         });
-        return local;
+        return snapshot;
     }
 
     private Instant toInstant(LocalDateTime time) {

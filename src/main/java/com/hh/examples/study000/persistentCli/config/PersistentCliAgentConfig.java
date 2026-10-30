@@ -3,8 +3,10 @@ package com.hh.examples.study000.persistentCli.config;
 import com.google.adk.agents.LlmAgent;
 import com.google.adk.apps.App;
 import com.google.adk.artifacts.InMemoryArtifactService;
+import com.google.adk.plugins.LoggingPlugin;
 import com.google.adk.runner.Runner;
 import com.google.adk.summarizer.EventsCompactionConfig;
+import com.google.adk.summarizer.LlmEventSummarizer;
 import com.google.adk.tools.FunctionTool;
 import com.google.adk.tools.LoadMemoryTool;
 import com.google.adk.tools.mcp.McpToolset;
@@ -61,11 +63,28 @@ public class PersistentCliAgentConfig {
         return App.builder()
                 .name(PersistentCliProperties.APP_NAME)
                 .rootAgent(persistentCliAgent)
+
+                /*
+                  旧的一批 events -> summarizer 生成一条 compaction event
+                  最近 overlap 的一部分 events -> 原样保留
+                 */
                 .eventsCompactionConfig(EventsCompactionConfig.builder()
                         .compactionInterval(10)
                         .overlapSize(1)
-                        .summarizer(new SimpleEventSummarizer(OpenAILangChainModelFactory.createChatModel()))
+//                        .summarizer(new LlmEventSummarizer(OpenAILangChainModelFactory.createChatModel()))      // ADK 默认压缩
+                        .summarizer(new SimpleEventSummarizer(OpenAILangChainModelFactory.createChatModel()))   // 自定义压缩
                         .build())
+
+                /*
+                 * 当上下文 token 超过阈值时，
+                 * 保留最近 eventRetentionSize 条 events，
+                 * 更早的 events 交给 summarizer 压成 compaction event。
+                 */
+//                .eventsCompactionConfig(EventsCompactionConfig.builder()
+//                        .tokenThreshold(8000)
+//                        .eventRetentionSize(20)
+//                        .summarizer(new SimpleEventSummarizer(OpenAILangChainModelFactory.createChatModel()))
+//                        .build())
                 .build();
     }
 

@@ -20,7 +20,21 @@
         <dependency>
             <groupId>com.google.adk</groupId>
             <artifactId>google-adk</artifactId>
-            <version>1.4.0</version>
+            <version>1.7.0</version>
+        </dependency>
+
+        <!-- PlannerAgent and built-in planner strategies are released separately. -->
+        <dependency>
+            <groupId>com.google.adk</groupId>
+            <artifactId>google-adk-planners</artifactId>
+            <version>1.7.0</version>
+        </dependency>
+
+        <!-- ADK's Agent2Agent protocol integration. -->
+        <dependency>
+            <groupId>com.google.adk</groupId>
+            <artifactId>google-adk-a2a</artifactId>
+            <version>1.7.0</version>
         </dependency>
 
         <!--
@@ -63,7 +77,7 @@
         <dependency>
             <groupId>com.google.adk</groupId>
             <artifactId>google-adk-langchain4j</artifactId>
-            <version>1.4.0</version>
+            <version>1.7.0</version>
         </dependency>
 
         <dependency>

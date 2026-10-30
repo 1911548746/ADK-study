@@ -55,6 +55,38 @@
 
 ------
 
+## 查阅文档
+
+涉及 Google ADK 时，优先使用 `adk-docs-mcp` 查询 ADK 官方文档；应先调用 `list_doc_sources`，再使用 `fetch_docs` 获取相关页面。
+
+涉及 LangChain 等其他第三方库时，必须先通过 Context7 查询当前文档，不能只依赖模型记忆。
+
+**使用 ctx7 查询文档；所有 `npx ctx7@latest` 命令必须在 Codex 默认沙盒之外运行。**
+
+查询流程：
+
+1. 解析库标识：
+
+   ```powershell
+   npx ctx7@latest library "Google Agent Development Kit Java" "<完整问题>"
+   ```
+
+2. 从结果中选择官方名称匹配、来源信誉高、示例覆盖充分的 `/org/project` 标识。
+
+3. 查询具体文档：
+
+   ```powershell
+   npx ctx7@latest docs /google/adk-java "<完整问题>"
+   ```
+
+4. 默认结果不足时，最多再使用一次 `--research`。
+
+5. 单个问题最多执行 3 次 Context7 命令；发生 quota 错误时明确告知用户，不得静默使用旧知识替代。
+
+---
+
+
+
 ## 示例开发原则
 
 每个示例独立。
